@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:13
+    container_name: n8n_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: n8n
+      POSTGRES_DB: n8n
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - frappe_network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile.n8n-ffmpeg-ext
+    container_name: n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=usuario
+      - N8N_BASIC_AUTH_PASSWORD=senha
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=n8n
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - NODE_FUNCTION_ALLOW_EXTERNAL=*
+      - NODE_FUNCTION_ALLOW_BUILTIN=*
+      - N8N_HOST=http://localhost:5678/
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - ./videos-recebidos:/data/recebidos
+      - ./videos-finalizados:/data/finalizados
+      - ./overlays:/data/overlays
+      - ./videos-youtubers-finalizados:/data/youtubers
+      - ./videos-recebidos-youtubers:/data/recebidos-youtubers
+      - ./over-ytb:/data/over-ytb
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - postgres
+    networks:
+      - frappe_network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 5G
+
+  ngrok:
+    image: ngrok/ngrok:alpine
+    container_name: ngrok
+    restart: always
+    depends_on:
+      - n8n
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_TOKEN}
+    command: ["http", "--region=us", "n8n:5678"]
+    ports:
+      - "4040:4040"
+    networks:
+      - frappe_network
+
+volumes:
+  db_data:
+  n8n_data:
+
+networks:
+  frappe_network:
+    external: true
